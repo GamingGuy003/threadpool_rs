@@ -45,7 +45,7 @@ impl Drop for ThreadPool {
             
             if let Some(thread) = worker.thread.take() {
                 #[cfg(feature = "log")]
-                trace!("Shutting down worker {}", worker.id);
+                trace!("Shutting down worker {}", worker._id);
                 thread.join().unwrap();
             }
         }
