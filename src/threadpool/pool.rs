@@ -61,7 +61,7 @@ impl Worker {
     fn new(id: usize, receiver: Arc<Mutex<mpsc::Receiver<Job>>>) -> Worker {
         let thread = thread::spawn(move || loop {
             // do not move this into the match statement or the threads will not run in parallel for some reason??
-            let message = receiver.lock().unwrap().recv();
+            let message = receiver.lock().expect("Failed to lock worker receiver").recv();
 
             match message {
                 Ok(job) => {
