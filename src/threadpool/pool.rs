@@ -3,9 +3,6 @@ use std::{
     thread,
 };
 
-#[cfg(feature = "log")]
-use log::{trace, warn};
-
 pub struct ThreadPool {
     workers: Vec<Worker>,
     sender: Option<mpsc::Sender<Job>>,
@@ -40,19 +37,14 @@ impl ThreadPool {
         for worker in &mut self.workers {
             if let Some(thread) = worker.thread.take() {
                 #[cfg(feature = "log")]
-                trace!("Joining worker {}", worker._id);
-                let _ = thread.join().map_err(|_err| {
-                    #[cfg(feature = "log")]
-                    warn!("Failed to join worker: {_err}")
-                });
+                log::trace!("Joining worker {}", worker._id);
+                thread.join().expect("Failed to join thread");
             }
         }
     } 
 }
 
 impl Drop for ThreadPool {
-    #[cfg(feature = "log")]
-    trace!("Dropping pool");
     fn drop(&mut self) {
         self.join();
         drop(self.sender.take());
@@ -74,12 +66,12 @@ impl Worker {
             match message {
                 Ok(job) => {
                     #[cfg(feature = "log")]
-                    trace!("Worker {id} got a job; executing");
+                    log::trace!("Worker {id} got a job; executing");
                     job();
                 }
                 Err(_) => {
                     #[cfg(feature = "log")]
-                    trace!("Worker {id} disconnected; shutting down");
+                    log::trace!("Worker {id} disconnected; shutting down");
                     break;
                 }
             }
