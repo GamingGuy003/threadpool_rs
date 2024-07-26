@@ -69,7 +69,7 @@ impl Worker {
                 Ok(job) => job,
                 Err(_) => {
                     #[cfg(feature = "log")]
-                    log::warn!("Channel closed. Stopping threads");
+                    log::trace!("Channel closed. Stopping thread");
                     break;
                 }
             };
