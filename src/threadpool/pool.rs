@@ -4,7 +4,7 @@ use std::{
 };
 
 #[cfg(feature = "log")]
-use log::trace;
+use log::{trace, warn};
 
 pub struct ThreadPool {
     workers: Vec<Worker>,
@@ -35,20 +35,28 @@ impl ThreadPool {
         let job = Box::new(f);
         self.sender.as_ref().expect("Failed to get sender").send(job).expect("Failed to send job to thread");
     }
+
+    pub fn join(&mut self) {
+        for worker in &mut self.workers {
+            if let Some(thread) = worker.thread.take() {
+                #[cfg(feature = "log")]
+                trace!("Joining worker {}", worker._id);
+                let _ = thread.join().map_err(|_err| {
+                    #[cfg(feature = "log")]
+                    warn!("Failed to join worker: {_err}")
+                });
+            }
+        }
+    } 
 }
 
 impl Drop for ThreadPool {
+    #[cfg(feature = "log")]
+    trace!("Dropping pool");
     fn drop(&mut self) {
+        self.join();
         drop(self.sender.take());
 
-        for worker in &mut self.workers {
-            
-            if let Some(thread) = worker.thread.take() {
-                #[cfg(feature = "log")]
-                trace!("Shutting down worker {}", worker._id);
-                thread.join().unwrap();
-            }
-        }
     }
 }
 
