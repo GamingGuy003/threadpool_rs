@@ -42,6 +42,7 @@ impl ThreadPool {
                 thread.join().expect("Failed to join thread");
             }
         }
+        println!("Done joining");
     } 
 }
 
