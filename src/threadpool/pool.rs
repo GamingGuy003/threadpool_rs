@@ -1,87 +1,85 @@
 use std::{
-    sync::{mpsc, Arc, Mutex},
-    thread,
+    sync::{atomic::AtomicUsize, mpsc, Arc, Mutex},
+    thread, usize,
 };
 
-pub struct ThreadPool {
-    workers: Vec<Worker>,
-    sender: Option<mpsc::Sender<Job>>,
+pub struct Threadpool {
+    _workers: Vec<Worker>,
+    sender: mpsc::Sender<Job>,
+    pending: Arc<AtomicUsize>,
 }
 
 type Job = Box<dyn FnOnce() + Send + 'static>;
 
-impl ThreadPool {
-    pub fn new(size: usize) -> Result<ThreadPool, std::io::Error> {
-        if size == 0 { return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, "Cannot create pool with zero threads")) }
+impl Threadpool {
+    pub fn new(size: usize) -> Self {
+        assert!(size > 0);
 
         let (sender, receiver) = mpsc::channel();
         let receiver = Arc::new(Mutex::new(receiver));
-        let mut workers = Vec::with_capacity(size);
+        let pending = Arc::new(AtomicUsize::new(0));
+
+        let mut _workers = Vec::with_capacity(size);
 
         for id in 0..size {
-            workers.push(Worker::new(id, Arc::clone(&receiver)));
+            let receiver_c = receiver.clone();
+            let pending_c = pending.clone();
+            _workers.push(Worker::new(id, receiver_c, pending_c));
         }
 
-        Ok(ThreadPool {
-            workers,
-            sender: Some(sender),
-        })
+        Self {
+            _workers,
+            sender,
+            pending,
+        }
     }
 
-    pub fn execute<F>(&self, f: F) where F: FnOnce() + Send + 'static, {
+    pub fn execute<F>(&mut self, f: F)
+    where
+        F: FnOnce() + Send + 'static,
+    {
         let job = Box::new(f);
-        self.sender.as_ref().expect("Failed to get sender").send(job).expect("Failed to send job to thread");
+        self.sender.send(job).expect("Failed to send job");
+        self.pending
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
     }
 
-    pub fn join(&mut self) {
-        for worker in &mut self.workers {
-            println!("Joining worker {}", worker._id);
-            if let Some(thread) = worker.thread.take() {
-                #[cfg(feature = "log")]
-                log::trace!("Joining worker {}", worker._id);
-                thread.join().expect("Failed to join thread");
-            }
-        }
-        println!("Done joining");
-    } 
-}
-
-impl Drop for ThreadPool {
-    fn drop(&mut self) {
-        self.join();
-        drop(self.sender.take());
-
+    pub fn join(&self) {
+        while self.pending.load(std::sync::atomic::Ordering::SeqCst) > 0 {}
     }
 }
 
 struct Worker {
     _id: usize,
-    thread: Option<thread::JoinHandle<()>>,
+    _thread: thread::JoinHandle<()>,
 }
 
 impl Worker {
-    fn new(id: usize, receiver: Arc<Mutex<mpsc::Receiver<Job>>>) -> Worker {
-        let thread = thread::spawn(move || loop {
-            // do not move this into the match statement or the threads will not run in parallel for some reason??
-            let message = receiver.lock().expect("Failed to lock worker receiver").recv();
-
-            match message {
-                Ok(job) => {
-                    #[cfg(feature = "log")]
-                    log::trace!("Worker {id} got a job; executing");
-                    job();
-                }
+    pub fn new(
+        _id: usize,
+        receiver: Arc<Mutex<mpsc::Receiver<Job>>>,
+        pending: Arc<AtomicUsize>,
+    ) -> Self {
+        let _thread = thread::spawn(move || loop {
+            let job = match receiver
+                .lock()
+                .expect("Failed to lock receive channel")
+                .recv()
+            {
+                Ok(job) => job,
                 Err(_) => {
                     #[cfg(feature = "log")]
-                    log::trace!("Worker {id} disconnected; shutting down");
+                    log::warn!("Channel closed. Stopping threads");
                     break;
                 }
-            }
+            };
+
+            job();
+            pending.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
+            #[cfg(feature = "log")]
+            log::debug!("Worker {} finished. {} Tasks remain.", _id, pending.load(std::sync::atomic::Ordering::SeqCst));
         });
 
-        Worker {
-            _id: id,
-            thread: Some(thread),
-        }
+        Worker { _id, _thread }
     }
 }
