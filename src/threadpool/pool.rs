@@ -35,6 +35,7 @@ impl ThreadPool {
 
     pub fn join(&mut self) {
         for worker in &mut self.workers {
+            println!("Joining worker {}", worker._id);
             if let Some(thread) = worker.thread.take() {
                 #[cfg(feature = "log")]
                 log::trace!("Joining worker {}", worker._id);
