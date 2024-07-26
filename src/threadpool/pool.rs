@@ -77,7 +77,11 @@ impl Worker {
             job();
             pending.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
             #[cfg(feature = "log")]
-            log::debug!("Worker {} finished. {} Tasks remain.", _id, pending.load(std::sync::atomic::Ordering::SeqCst));
+            log::debug!(
+                "Worker {} finished. {} Tasks remain.",
+                _id,
+                pending.load(std::sync::atomic::Ordering::SeqCst)
+            );
         });
 
         Worker { _id, _thread }
