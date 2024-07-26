@@ -1,6 +1,6 @@
 use std::{
     sync::{atomic::AtomicUsize, mpsc, Arc, Mutex},
-    thread, usize,
+    thread,
 };
 
 pub struct Threadpool {
