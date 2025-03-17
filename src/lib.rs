@@ -105,21 +105,20 @@ impl Worker {
                     pending.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
                     #[cfg(feature = "log")]
                     log::debug!(
-                        "Worker {} finished. {} Tasks remain.",
-                        _id,
+                        "Worker {id} finished. {} Tasks remain.",
                         pending.load(std::sync::atomic::Ordering::SeqCst)
                     );
                 }
                 // Received an early abort
                 Ok(None) => {
                     #[cfg(feature = "log")]
-                    log::trace!("Received early abort. Stopping thread");
+                    log::trace!("Received abort. Stopping thread {id}");
                     break;
                 }
                 // Received an error
                 Err(_) => {
                     #[cfg(feature = "log")]
-                    log::trace!("Channel closed. Stopping thread");
+                    log::trace!("Channel closed. Stopping thread {id}");
                     break;
                 }
             };
