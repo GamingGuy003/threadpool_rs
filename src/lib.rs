@@ -50,13 +50,13 @@ impl Threadpool {
             .send(Some(Box::new(f)))
             .expect("Failed to send job");
         // Increment pending counter
-        println!("Attempting add");
         self.pending
             .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-        println!("Added");
     }
 
     pub fn join(&mut self) {
+        while self.pending.load(std::sync::atomic::Ordering::SeqCst) > 0 {}
+        /*
         // If there are still pending jobs, yield cpu
         while self.pending.load(std::sync::atomic::Ordering::SeqCst) > 0 {
             std::thread::yield_now();
@@ -78,6 +78,7 @@ impl Threadpool {
                 .join()
                 .expect("Worker failed to join");
         }
+        */
     }
 }
 
