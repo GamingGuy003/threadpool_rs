@@ -55,8 +55,6 @@ impl Threadpool {
     }
 
     pub fn join(&mut self) {
-        while self.pending.load(std::sync::atomic::Ordering::SeqCst) > 0 {}
-        /*
         // If there are still pending jobs, yield cpu
         while self.pending.load(std::sync::atomic::Ordering::SeqCst) > 0 {
             std::thread::yield_now();
@@ -78,7 +76,6 @@ impl Threadpool {
                 .join()
                 .expect("Worker failed to join");
         }
-        */
     }
 }
 
@@ -97,11 +94,11 @@ impl Worker {
         pending: Arc<AtomicUsize>,
     ) -> Self {
         let thread = thread::spawn(move || loop {
-            match receiver
+            let maybe_job = receiver
                 .lock()
                 .expect("Failed to lock receiver channel")
-                .recv()
-            {
+                .recv();
+            match maybe_job {
                 // Received a job to run
                 Ok(Some(job)) => {
                     job();
