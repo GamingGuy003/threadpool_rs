@@ -56,26 +56,7 @@ impl Threadpool {
 
     pub fn join(&mut self) {
         // If there are still pending jobs, yield cpu
-        while self.pending.load(std::sync::atomic::Ordering::SeqCst) > 0 {
-            std::thread::yield_now();
-        }
-
-        // Send shutdown signal to all running threads
-        for _ in &self.workers {
-            self.sender
-                .send(None)
-                .expect("Failed to send shutdown signal to thread");
-        }
-
-        // Join worker threads
-        for worker in &mut self.workers {
-            worker
-                .thread
-                .take()
-                .expect("Thread already joined")
-                .join()
-                .expect("Worker failed to join");
-        }
+        while self.pending.load(std::sync::atomic::Ordering::SeqCst) > 0 {}
     }
 }
 
